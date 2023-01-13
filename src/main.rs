@@ -1,3 +1,5 @@
+#![feature(type_alias_impl_trait)]
+
 use std::{
     future::Future,
     pin::Pin,
@@ -12,6 +14,10 @@ async fn main() {
 
     let s = Sum { inner: fut };
     dbg!(s.await);
+
+    let bar = Bar;
+
+    dbg!(bar.op().await);
 }
 
 async fn add(a: i32, b: i32) -> i32 {
@@ -19,7 +25,10 @@ async fn add(a: i32, b: i32) -> i32 {
 }
 
 #[pin_project]
-struct Sum<F> {
+pub struct Sum<F>
+where
+    F: Future,
+{
     #[pin]
     inner: F,
 }
@@ -33,5 +42,24 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         this.inner.poll(cx)
+    }
+}
+
+pub trait Op {
+    type R;
+
+    fn op(&self) -> Sum<Self::R>
+    where
+        <Self as Op>::R: Future;
+}
+
+struct Bar;
+
+impl Op for Bar {
+    type R = impl Future<Output = i32>;
+
+    fn op(&self) -> Sum<Self::R> {
+        let fut = add(1, 2);
+        Sum { inner: fut }
     }
 }
